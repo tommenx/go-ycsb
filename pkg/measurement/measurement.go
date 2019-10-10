@@ -61,6 +61,9 @@ func (m *measurement) output() {
 
 	for _, op := range keys {
 		fmt.Printf("%-6s - %s\n", op, m.opMeasurement[op].Summary())
+		if err := m.opMeasurement[op].Log(); err != nil {
+			fmt.Printf("log error, err=%+v", err)
+		}
 	}
 }
 

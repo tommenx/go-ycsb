@@ -32,4 +32,5 @@ type Measurement interface {
 	Summary() string
 	// Info returns the MeasurementInfo of the measurement.
 	Info() MeasurementInfo
+	Log() error
 }

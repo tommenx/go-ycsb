@@ -16,6 +16,8 @@ package measurement
 import (
 	"bytes"
 	"fmt"
+	"github.com/pingcap/go-ycsb/pkg/label"
+	"github.com/pingcap/go-ycsb/pkg/store"
 	"math"
 	"sort"
 	"sync/atomic"
@@ -120,6 +122,18 @@ func (h *histogram) Summary() string {
 	buf.WriteString(fmt.Sprintf("99.99th(us): %d", res[PER9999TH]))
 
 	return buf.String()
+}
+
+func (h *histogram) Log() error {
+	var err error
+	res := h.getInfo()
+	logQPS := fmt.Sprintf("%v", res[COUNT])
+	fmt.Printf("job:%s, qps %s", label.JobName, logQPS)
+	if err = store.LogDB.ZAdd(label.JobName, logQPS); err != nil {
+		fmt.Printf("zadd error, err=%+v", err)
+		return err
+	}
+	return nil
 }
 
 func (h *histogram) getInfo() map[string]interface{} {

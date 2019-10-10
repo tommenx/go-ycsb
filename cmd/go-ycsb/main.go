@@ -15,6 +15,8 @@ package main
 
 import (
 	"context"
+	"github.com/pingcap/go-ycsb/pkg/label"
+	"github.com/pingcap/go-ycsb/pkg/store"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -123,6 +125,11 @@ func initialGlobal(dbName string, onProperties func()) {
 		util.Fatalf("create db %s failed %v", dbName, err)
 	}
 	globalDB = client.DbWrapper{globalDB}
+	fmt.Printf("redis url= %s", label.RedisAddr)
+	store.LogDB = store.NewRedis(label.RedisAddr)
+	if err = store.LogDB.LPush("client", label.JobName); err != nil {
+		util.Fatalf("lpush %s failed %v", label.JobName, err)
+	}
 }
 
 func main() {
