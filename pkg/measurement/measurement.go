@@ -15,6 +15,7 @@ package measurement
 
 import (
 	"fmt"
+	"github.com/pingcap/go-ycsb/pkg/label"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -61,8 +62,10 @@ func (m *measurement) output() {
 
 	for _, op := range keys {
 		fmt.Printf("%-6s - %s\n", op, m.opMeasurement[op].Summary())
-		if err := m.opMeasurement[op].Log(); err != nil {
-			fmt.Printf("log error, err=%+v", err)
+		if label.Log != "none" {
+			if err := m.opMeasurement[op].Log(); err != nil {
+				fmt.Printf("log error, err=%+v", err)
+			}
 		}
 	}
 }

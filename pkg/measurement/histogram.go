@@ -47,6 +47,7 @@ const (
 	ELAPSED                 = "ELAPSED"
 	COUNT                   = "COUNT"
 	QPS                     = "QPS"
+	ACQPS                   = "ACQPS"
 	AVG                     = "AVG"
 	MIN                     = "MIN"
 	MAX                     = "MAX"
@@ -114,6 +115,7 @@ func (h *histogram) Summary() string {
 	buf.WriteString(fmt.Sprintf("Takes(s): %.1f, ", res[ELAPSED]))
 	buf.WriteString(fmt.Sprintf("Count: %d, ", res[COUNT]))
 	buf.WriteString(fmt.Sprintf("OPS: %.1f, ", res[QPS]))
+	buf.WriteString(fmt.Sprintf("ACQPS: %.1f, ", res[ACQPS]))
 	buf.WriteString(fmt.Sprintf("Avg(us): %d, ", res[AVG]))
 	buf.WriteString(fmt.Sprintf("Min(us): %d, ", res[MIN]))
 	buf.WriteString(fmt.Sprintf("Max(us): %d, ", res[MAX]))
@@ -180,7 +182,8 @@ func (h *histogram) getInfo() map[string]interface{} {
 	res[PER99TH] = per99
 	res[PER999TH] = per999
 	res[PER9999TH] = per9999
-
+	res[ACQPS] = float64(count-label.PreCount) / float64(10)
+	label.PreCount = count
 	return res
 }
 
