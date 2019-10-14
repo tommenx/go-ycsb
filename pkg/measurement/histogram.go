@@ -35,6 +35,7 @@ type histogram struct {
 	sum           int64
 	min           int64
 	max           int64
+	precount      int64
 	startTime     time.Time
 }
 
@@ -143,6 +144,8 @@ func (h *histogram) getInfo() map[string]interface{} {
 	max := atomic.LoadInt64(&h.max)
 	sum := atomic.LoadInt64(&h.sum)
 	count := atomic.LoadInt64(&h.count)
+	precount := atomic.LoadInt64(&h.precount)
+	atomic.StoreInt64(&h.precount, count)
 
 	bounds := h.boundCounts.Keys()
 	sort.Ints(bounds)
@@ -182,8 +185,7 @@ func (h *histogram) getInfo() map[string]interface{} {
 	res[PER99TH] = per99
 	res[PER999TH] = per999
 	res[PER9999TH] = per9999
-	res[ACQPS] = float64(count-label.PreCount) / float64(10)
-	label.PreCount = count
+	res[ACQPS] = float64(count-precount) / 10
 	return res
 }
 

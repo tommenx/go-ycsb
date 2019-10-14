@@ -24,4 +24,3 @@ endif
 
 check:
 	golint -set_exit_status db/... cmd/... pkg/...
-
