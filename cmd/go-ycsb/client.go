@@ -79,7 +79,7 @@ func initClientCommand(m *cobra.Command) {
 	m.Flags().IntVar(&threadsArg, "threads", 1, "Execute using n threads - can also be specified as the \"threadcount\" property")
 	m.Flags().IntVar(&targetArg, "target", 0, "Attempt to do n operations per second (default: unlimited) - can also be specified as the \"target\" property")
 	m.Flags().StringVar(&label.Log, "log", "none", "Specify if use log")
-	m.Flags().StringVar(&label.RedisAddr, "redis", "127.0.0.1:6379", "Specify the redis path")
+	m.Flags().StringVar(&label.StoreAddr, "store", "127.0.0.1:6379", "Specify the redis path")
 	m.Flags().StringVar(&label.JobName, "job", "", "Specify the job name")
 }
 

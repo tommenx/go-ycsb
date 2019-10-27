@@ -16,8 +16,11 @@ package client
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -39,6 +42,35 @@ type worker struct {
 	threadID        int
 	targetOpsTickNs int64
 	opsDone         int64
+}
+
+var delay_i = 0 // record the delay time
+
+func delay(threadCount int, loop_number int) {
+	// set the thread's delayed time
+	if loop_number%1000 == 0 {
+		qps, err := ioutil.ReadFile("qps")
+		qps_s := string(qps)
+		if err != nil {
+			// fmt.Println("delay is not set. The default delay time is 0.")
+			qps_s = "0"
+		}
+		qps_s = strings.Trim(qps_s, " \n")
+		qps_i, err := strconv.Atoi(qps_s)
+		if err != nil {
+			// fmt.Println("QPS's format is wrong, it should be an integer. So it's set 0.")
+			qps_i = 0
+		}
+
+		if err != nil || qps_i == 0 || qps_i/threadCount == 0 {
+			// fmt.Println("The delay time has been set to the default 0...")
+			delay_i = 0
+		} else {
+			delay_i = 1000 / (qps_i / threadCount) // 每个线程在每秒的延时时间(ms)
+		}
+		// fmt.Println("This thread's delay time has been set to ", delay_i)
+	}
+	time.Sleep(time.Duration(delay_i) * time.Millisecond)
 }
 
 func newWorker(p *properties.Properties, threadID int, threadCount int, workload ycsb.Workload, db ycsb.DB) *worker {
@@ -107,7 +139,7 @@ func (w *worker) throttle(ctx context.Context, startTime time.Time) {
 	}
 }
 
-func (w *worker) run(ctx context.Context) {
+func (w *worker) run(ctx context.Context, threadCount int) {
 	// spread the thread operation out so they don't all hit the DB at the same time
 	if w.targetOpsPerMs > 0.0 && w.targetOpsPerMs <= 1.0 {
 		time.Sleep(time.Duration(rand.Int63n(w.targetOpsTickNs)))
@@ -115,7 +147,11 @@ func (w *worker) run(ctx context.Context) {
 
 	startTime := time.Now()
 
+	var loop_number = 0
 	for w.opCount == 0 || w.opsDone < w.opCount {
+		delay(threadCount, loop_number) // 对线程的每次操作进行延时限制
+		loop_number++
+
 		var err error
 		opsCount := 1
 		if w.doTransactions {
@@ -209,7 +245,7 @@ func (c *Client) Run(ctx context.Context) {
 			w := newWorker(c.p, threadId, threadCount, c.workload, c.db)
 			ctx := c.workload.InitThread(ctx, threadId, threadCount)
 			ctx = c.db.InitThread(ctx, threadId, threadCount)
-			w.run(ctx)
+			w.run(ctx, threadCount)
 			c.db.CleanupThread(ctx)
 			c.workload.CleanupThread(ctx)
 		}(i)

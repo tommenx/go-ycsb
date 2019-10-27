@@ -1,7 +1,7 @@
 package label
 
 var (
-	RedisAddr string
+	StoreAddr string
 	JobName   string
 	Log       string
 )

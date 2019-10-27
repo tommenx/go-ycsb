@@ -132,7 +132,7 @@ func (h *histogram) Log() error {
 	res := h.getInfo()
 	logQPS := fmt.Sprintf("%v", res[COUNT])
 	fmt.Printf("job:%s, qps %s", label.JobName, logQPS)
-	if err = store.LogDB.ZAdd(label.JobName, logQPS); err != nil {
+	if err = store.LogDB.PutOne(label.JobName, logQPS); err != nil {
 		fmt.Printf("zadd error, err=%+v", err)
 		return err
 	}

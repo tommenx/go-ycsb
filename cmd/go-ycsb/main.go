@@ -125,12 +125,15 @@ func initialGlobal(dbName string, onProperties func()) {
 		util.Fatalf("create db %s failed %v", dbName, err)
 	}
 	globalDB = client.DbWrapper{globalDB}
+	//if label.Log != "none" {
+	//	fmt.Printf("redis url= %s", label.RedisAddr)
+	//	store.LogDB = store.NewRedis(label.RedisAddr)
+	//	if err = store.LogDB.LPush("client", label.JobName); err != nil {
+	//		util.Fatalf("lpush %s failed %v", label.JobName, err)
+	//	}
+	//}
 	if label.Log != "none" {
-		fmt.Printf("redis url= %s", label.RedisAddr)
-		store.LogDB = store.NewRedis(label.RedisAddr)
-		if err = store.LogDB.LPush("client", label.JobName); err != nil {
-			util.Fatalf("lpush %s failed %v", label.JobName, err)
-		}
+		store.LogDB = store.NewEtcd(label.StoreAddr)
 	}
 }
 
@@ -143,7 +146,6 @@ func main() {
 		syscall.SIGINT,
 		syscall.SIGTERM,
 		syscall.SIGQUIT)
-
 	closeDone := make(chan struct{}, 1)
 	go func() {
 		sig := <-sc
