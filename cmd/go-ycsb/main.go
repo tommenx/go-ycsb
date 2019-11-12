@@ -17,10 +17,12 @@ import (
 	"context"
 	"github.com/pingcap/go-ycsb/pkg/label"
 	"github.com/pingcap/go-ycsb/pkg/store"
+	"io/ioutil"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -125,15 +127,14 @@ func initialGlobal(dbName string, onProperties func()) {
 		util.Fatalf("create db %s failed %v", dbName, err)
 	}
 	globalDB = client.DbWrapper{globalDB}
-	//if label.Log != "none" {
-	//	fmt.Printf("redis url= %s", label.RedisAddr)
-	//	store.LogDB = store.NewRedis(label.RedisAddr)
-	//	if err = store.LogDB.LPush("client", label.JobName); err != nil {
-	//		util.Fatalf("lpush %s failed %v", label.JobName, err)
-	//	}
-	//}
 	if label.Log != "none" {
 		store.LogDB = store.NewEtcd(label.StoreAddr)
+		store.LogDB.PutOne(label.JobName, fmt.Sprintf("%d", label.OperationCount), label.PREFIX_REQUEST_OPERATION)
+		label.QPS = store.LogDB.GetOne("/storage/setting/qps")
+		go store.LogDB.Watch("/storage/setting/qps", func(val string) {
+			settingQPS, _ := strconv.Atoi(val)
+			label.QPS = settingQPS
+		})
 	}
 }
 
@@ -164,6 +165,16 @@ func main() {
 			return
 		}
 	}()
+	//updateQPS()
+	//updateTicker := time.NewTicker(time.Second * 5)
+	//go func() {
+	//	for {
+	//		select {
+	//		case <-updateTicker.C:
+	//			go updateQPS()
+	//		}
+	//	}
+	//}()
 
 	rootCmd := &cobra.Command{
 		Use:   "go-ycsb",
@@ -192,4 +203,20 @@ func main() {
 	}
 
 	closeDone <- struct{}{}
+}
+
+func updateQPS() {
+	qps, err := ioutil.ReadFile("qps")
+	qpsStr := strings.Trim(string(qps), " \n")
+	qpsInt, err := strconv.Atoi(qpsStr)
+	if err != nil {
+		fmt.Printf("set qps from file error, err=%+v", err)
+		qpsInt = 0
+	}
+	label.QPS = qpsInt
+	if label.Log != "none" && store.LogDB != nil {
+		if err := store.LogDB.PutOne(label.JobName, fmt.Sprintf("%d", qpsInt), label.PREFIX_REQUEST_QPS); err != nil {
+			fmt.Printf("set request qps error, err=%+v", err)
+		}
+	}
 }

@@ -81,6 +81,7 @@ func initClientCommand(m *cobra.Command) {
 	m.Flags().StringVar(&label.Log, "log", "none", "Specify if use log")
 	m.Flags().StringVar(&label.StoreAddr, "store", "127.0.0.1:6379", "Specify the redis path")
 	m.Flags().StringVar(&label.JobName, "job", "", "Specify the job name")
+	m.Flags().IntVar(&label.OperationCount, "operation", 1000000, "Specify operation count")
 }
 
 func newLoadCommand() *cobra.Command {

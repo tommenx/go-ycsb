@@ -16,11 +16,9 @@ package client
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"github.com/pingcap/go-ycsb/pkg/label"
 	"math/rand"
 	"os"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -44,33 +42,33 @@ type worker struct {
 	opsDone         int64
 }
 
-var delay_i = 0 // record the delay time
-
-func delay(threadCount int, loop_number int) {
-	// set the thread's delayed time
-	if loop_number%1000 == 0 {
-		qps, err := ioutil.ReadFile("qps")
-		qps_s := string(qps)
-		if err != nil {
-			// fmt.Println("delay is not set. The default delay time is 0.")
-			qps_s = "0"
-		}
-		qps_s = strings.Trim(qps_s, " \n")
-		qps_i, err := strconv.Atoi(qps_s)
-		if err != nil {
-			// fmt.Println("QPS's format is wrong, it should be an integer. So it's set 0.")
-			qps_i = 0
-		}
-
-		if err != nil || qps_i == 0 || qps_i/threadCount == 0 {
-			// fmt.Println("The delay time has been set to the default 0...")
-			delay_i = 0
-		} else {
-			delay_i = 1000 / (qps_i / threadCount) // 每个线程在每秒的延时时间(ms)
-		}
-		// fmt.Println("This thread's delay time has been set to ", delay_i)
+//var delayInt = 0 // record the delay time (Millisecond)
+func delay(threadCount int, loopNumber int, transactionTime time.Duration) {
+	// if loopNumber is k * 1000, update the delayInt(ms)
+	//if loopNumber%1000 == 0 {
+	//	qps, err := ioutil.ReadFile("qps")
+	//	qpsString := string(qps)
+	//	if err != nil {
+	//		qpsString = "0" // delay is not set. The default delay time is 0.
+	//	}
+	//	qpsString = strings.Trim(qpsString, " \n")
+	//	qpsInt, err := strconv.Atoi(qpsString)
+	//	if err != nil {
+	//		qpsInt = 0 // QPS's format is wrong, it should be an integer. So it's set 0.
+	//	}
+	//
+	//	if err != nil || qpsInt == 0 || qpsInt/threadCount == 0 {
+	//		delayInt = 0 // The delay time has been set to the default 0.
+	//	} else {
+	//		delayInt = 1000 / (qpsInt / threadCount) // 每个线程在每秒的延时时间(ms)
+	//	}
+	//}
+	//time.Sleep(time.Duration(delayInt)*time.Millisecond - transactionTime)
+	if label.QPS == 0 || label.QPS/threadCount == 0 {
+		return
 	}
-	time.Sleep(time.Duration(delay_i) * time.Millisecond)
+	delayDuration := time.Duration(1000/(label.QPS/threadCount)) * time.Millisecond
+	time.Sleep(delayDuration - transactionTime)
 }
 
 func newWorker(p *properties.Properties, threadID int, threadCount int, workload ycsb.Workload, db ycsb.DB) *worker {
@@ -146,14 +144,15 @@ func (w *worker) run(ctx context.Context, threadCount int) {
 	}
 
 	startTime := time.Now()
-
-	var loop_number = 0
+	loopNumber := 0 // loop_number记录循环次数，transaction_time记录数据库操作时间
+	var transactionTime time.Duration
 	for w.opCount == 0 || w.opsDone < w.opCount {
-		delay(threadCount, loop_number) // 对线程的每次操作进行延时限制
-		loop_number++
+		delay(threadCount, loopNumber, transactionTime) // 对线程的每次操作进行延时限制
+		loopNumber++
 
 		var err error
 		opsCount := 1
+		transactionBeginTime := time.Now()
 		if w.doTransactions {
 			if w.doBatch {
 				err = w.workload.DoBatchTransaction(ctx, w.batchSize, w.workDB)
@@ -169,6 +168,8 @@ func (w *worker) run(ctx context.Context, threadCount int) {
 				err = w.workload.DoInsert(ctx, w.workDB)
 			}
 		}
+		transactionEndTime := time.Now()
+		transactionTime = time.Duration(transactionEndTime.Sub(transactionBeginTime).Nanoseconds())
 
 		if err != nil && !w.p.GetBool(prop.Silence, prop.SilenceDefault) {
 			fmt.Printf("operation err: %v\n", err)

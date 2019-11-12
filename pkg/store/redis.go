@@ -9,7 +9,7 @@ type redis struct {
 	client *goredis.Client
 }
 
-func NewRedis(addr string) DB {
+func NewRedis(addr string) *redis {
 	cli := goredis.NewClient(&goredis.Options{
 		Addr:     addr,
 		Password: "",
@@ -20,7 +20,7 @@ func NewRedis(addr string) DB {
 	}
 }
 
-func (r *redis) PutOne(key string, val string) error {
+func (r *redis) PutOne(key string, val string, kind int) error {
 	cmd := r.client.ZAdd(key, goredis.Z{
 		Score:  float64(time.Now().UnixNano()),
 		Member: val,

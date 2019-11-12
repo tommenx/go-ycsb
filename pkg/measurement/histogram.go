@@ -36,6 +36,7 @@ type histogram struct {
 	min           int64
 	max           int64
 	precount      int64
+	preqps        int64
 	startTime     time.Time
 }
 
@@ -111,12 +112,11 @@ func (h *histogram) Measure(latency time.Duration) {
 
 func (h *histogram) Summary() string {
 	res := h.getInfo()
-
 	buf := new(bytes.Buffer)
 	buf.WriteString(fmt.Sprintf("Takes(s): %.1f, ", res[ELAPSED]))
 	buf.WriteString(fmt.Sprintf("Count: %d, ", res[COUNT]))
 	buf.WriteString(fmt.Sprintf("OPS: %.1f, ", res[QPS]))
-	buf.WriteString(fmt.Sprintf("ACQPS: %.1f, ", res[ACQPS]))
+	buf.WriteString(fmt.Sprintf("ACQPS: %d, ", res[ACQPS]))
 	buf.WriteString(fmt.Sprintf("Avg(us): %d, ", res[AVG]))
 	buf.WriteString(fmt.Sprintf("Min(us): %d, ", res[MIN]))
 	buf.WriteString(fmt.Sprintf("Max(us): %d, ", res[MAX]))
@@ -130,10 +130,14 @@ func (h *histogram) Summary() string {
 func (h *histogram) Log() error {
 	var err error
 	res := h.getInfo()
-	logQPS := fmt.Sprintf("%v", res[COUNT])
-	fmt.Printf("job:%s, qps %s", label.JobName, logQPS)
-	if err = store.LogDB.PutOne(label.JobName, logQPS); err != nil {
-		fmt.Printf("zadd error, err=%+v", err)
+	logQPS := fmt.Sprintf("%d", res[ACQPS])
+	logCount := fmt.Sprintf("%d", res[COUNT])
+	if err = store.LogDB.PutOne(label.JobName, logQPS, label.PREFIX_LOG_QPS); err != nil {
+		fmt.Printf("add log qps error, err=%+v", err)
+		return err
+	}
+	if err = store.LogDB.PutOne(label.JobName, logCount, label.PREFIX_LOG_OPERATION); err != nil {
+		fmt.Printf("add log operation count error, err=%+v", err)
 		return err
 	}
 	return nil
@@ -175,6 +179,13 @@ func (h *histogram) getInfo() map[string]interface{} {
 
 	elapsed := time.Now().Sub(h.startTime).Seconds()
 	qps := float64(count) / elapsed
+	acqps := int64((count - precount) / 10)
+	//在load数据的时候由于有的操作是0次，导致上报的实际qps数为0
+	if acqps != 0 {
+		atomic.StoreInt64(&h.preqps, acqps)
+	} else {
+		acqps = atomic.LoadInt64(&h.preqps)
+	}
 	res := make(map[string]interface{})
 	res[ELAPSED] = elapsed
 	res[COUNT] = count
@@ -185,7 +196,7 @@ func (h *histogram) getInfo() map[string]interface{} {
 	res[PER99TH] = per99
 	res[PER999TH] = per999
 	res[PER9999TH] = per9999
-	res[ACQPS] = float64(count-precount) / 10
+	res[ACQPS] = acqps
 	return res
 }
 
